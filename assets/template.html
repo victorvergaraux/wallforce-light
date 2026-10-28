@@ -1,0 +1,153 @@
+<title>Wallforce Light</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+/* Wallforce Light — one-file seed generator. Dark UI, chartreuse accent. */
+:root { --bg: #0a0a0a; --fg: #ededea; --mute: #8b8b86; --fill: #1f1f1f; --accent: #d4ff3a; color-scheme: dark; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); overflow: hidden; font: 400 13px/1.35 'Inter', system-ui, sans-serif; }
+#stage { position: fixed; inset: 0 316px 0 0; display: grid; place-items: center; }
+#poster { display: block; }
+#ui { position: fixed; top: 12px; right: 12px; width: 292px; max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: rgba(12,12,12,.92); z-index: 2; }
+#ui .row { display: flex; gap: 6px; }
+#ui input, #ui button { height: 32px; border: 0; border-radius: 8px; background: var(--fill); color: var(--fg); font: 500 12px 'Inter', sans-serif; }
+#ui input { flex: 1; min-width: 0; padding: 0 10px; font-family: 'IBM Plex Mono', monospace; letter-spacing: .08em; text-transform: uppercase; }
+#ui button { padding: 0 12px; cursor: pointer; }
+#ui button.primary { background: var(--accent); color: #0a0a0a; }
+#ui b { font: 800 12px 'Plus Jakarta Sans', sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+#ui small { color: var(--mute); }
+#pane { --tp-base-background-color: transparent; --tp-base-shadow-color: transparent; --tp-input-background-color: #1f1f1f; --tp-input-background-color-hover: #2a2a2a; --tp-input-background-color-focus: #2a2a2a; --tp-input-background-color-active: #2a2a2a; --tp-input-foreground-color: #ededea; --tp-label-foreground-color: #8b8b86; --tp-container-background-color: #1f1f1f; --tp-container-foreground-color: #ededea; --tp-button-background-color: #2a2a2a; --tp-button-foreground-color: #ededea; --tp-groove-foreground-color: #2a2a2a; --tp-base-font-family: 'Inter', system-ui, sans-serif; }
+#pane .tp-lstv_s { background: #1f1f1f; color: #ededea; }
+@media (max-width: 760px) { #stage { inset: 0 0 45dvh 0; } #ui { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 45dvh; overflow: auto; border-radius: 16px 16px 0 0; } }
+</style>
+<div id="stage"><canvas id="poster"></canvas></div>
+<aside id="ui">
+  <b>Wallforce Light</b>
+  <div class="row"><input id="seed" aria-label="Seed" maxlength="8"><button class="primary" id="gen">Generate</button></div>
+  <div class="row"><button id="png" style="flex:1">Download PNG</button></div>
+  <div id="pane"></div>
+  <small>Space new seed · D download</small>
+</aside>
+<script type="module">
+import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
+
+// ── Seeded random: xmur3 hashes the seed, sfc32 generates numbers.
+// Named streams keep layout and color independent of each other.
+function xmur3(s) { let h = 1779033703 ^ s.length; for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); } return () => { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
+function rng(seed, name) { const g = xmur3(seed + ':' + name); let a = g(), b = g(), c = g(), d = g();
+  const next = () => { a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; let t = (a + b) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0; c = (c << 21) | (c >>> 11); d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0; return (t >>> 0) / 4294967296; };
+  return { next, int: (lo, hi) => lo + Math.floor(next() * (hi - lo + 1)), pick: (arr) => arr[Math.floor(next() * arr.length)], chance: (p) => next() < p }; }
+const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newSeed = () => Array.from({ length: 6 }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join('');
+
+// ── Screens (exact export size) and palettes (each is dark or light).
+const SCREENS = { 'Full HD': [1920, 1080], 'Ultrawide': [3440, 1440], '4K': [3840, 2160], 'iPhone': [1206, 2622], 'Post 4:5': [1080, 1350] };
+const PALETTES = {
+  ink:   { bg: '#0E0E0E', ink: '#F2F0EA', colors: ['#D4FF3A', '#FF5A1F', '#7C8CFF', '#3A3A3A'] },
+  swiss: { bg: '#FFFFFF', ink: '#1A1A1A', colors: ['#FF5500', '#1A1A1A', '#2B4BFF', '#C9C9C4'] },
+  paper: { bg: '#F1ECE0', ink: '#111111', colors: ['#FF4500', '#1D3FBB', '#E8B400', '#BDB6A6'] },
+  cobalt:{ bg: '#0A1470', ink: '#F1F0FF', colors: ['#FF5A1F', '#FFD23F', '#A8B4FF', '#3D5AFE'] },
+};
+const WORDS = ['FORM', 'GRID', 'RAUM', 'LINIE', 'FELD', 'MODUL', 'PLAN', 'ACHSE'];
+
+const P = { screen: 'Full HD', margin: 48, cell: 128, count: 5, palette: 'ink' };
+let seed = newSeed();
+
+// Expo.easeInOut, 850 ms entrance.
+const expo = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2);
+
+// ── Layout in design units: short side = 1080 u, scaled to the exact pixels.
+function layout(W, H) {
+  const s = Math.min(W, H) / 1080, dw = W / s, dh = H / s;
+  const m = P.margin, pad = 48, box = { x: m + pad, y: m + pad, w: dw - 2 * (m + pad), h: dh - 2 * (m + pad) };
+  const cols = Math.max(2, Math.floor((box.w + 8) / (P.cell + 8))), rows = Math.max(2, Math.floor((box.h + 8) / (P.cell + 8)));
+  const cw = (box.w - (cols - 1) * 8) / cols, ch = (box.h - (rows - 1) * 8) / rows;
+  const r = rng(seed, 'lay'), b = rng(seed, 'blocks');
+  const top = r.chance(0.5), hRows = Math.max(1, Math.round(rows * 0.3));
+  const used = Array.from({ length: rows }, (_, y) => Array(cols).fill(top ? y < hRows : y >= rows - hRows));
+  const blocks = [];
+  for (let k = 0; k < P.count * 6 && blocks.length < P.count; k++) {
+    const sw = b.int(1, 3), sh = b.int(1, 3), c = b.int(0, cols - sw), y = b.int(0, rows - sh);
+    let ok = true; for (let j = 0; j < sh; j++) for (let i = 0; i < sw; i++) if (used[y + j][c + i]) ok = false;
+    if (!ok) continue;
+    for (let j = 0; j < sh; j++) for (let i = 0; i < sw; i++) used[y + j][c + i] = true;
+    blocks.push({ x: box.x + c * (cw + 8), y: box.y + y * (ch + 8), w: sw * cw + (sw - 1) * 8, h: sh * ch + (sh - 1) * 8, kind: b.pick(['solid', 'solid', 'dots', 'lines']), color: b.int(0, 3), dir: b.int(0, 3) });
+  }
+  const head = { x: box.x, y: top ? box.y : box.y + (rows - hRows) * (ch + 8), w: box.w * 0.7, h: hRows * ch + (hRows - 1) * 8 };
+  return { s, dw, dh, m, box, cols, rows, cw, ch, blocks, head, word: r.pick(WORDS) };
+}
+
+function draw(ctx, W, H, t) {
+  const L = layout(W, H), pal = PALETTES[P.palette];
+  ctx.save(); ctx.clearRect(0, 0, W, H); ctx.scale(L.s, L.s);
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, L.dw, L.dh);
+  // grid hairlines
+  ctx.globalAlpha = 0.18 * t; ctx.strokeStyle = pal.ink; ctx.lineWidth = 1;
+  for (let i = 0; i <= L.cols; i++) { const x = L.box.x + i * (L.cw + 8) - (i ? 4 : 0); ctx.beginPath(); ctx.moveTo(x, L.box.y); ctx.lineTo(x, L.box.y + L.box.h); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  // blocks wipe open, staggered
+  L.blocks.forEach((b, i) => {
+    const k = expo(Math.min(1, Math.max(0, t * 1.6 - i * 0.12))), c = pal.colors[b.color];
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w * (b.dir % 2 ? 1 : k), b.h * (b.dir % 2 ? k : 1)); ctx.clip();
+    ctx.fillStyle = c; ctx.strokeStyle = c;
+    if (b.kind === 'solid') ctx.fillRect(b.x, b.y, b.w, b.h);
+    else if (b.kind === 'dots') for (let y = b.y + 8; y < b.y + b.h; y += 16) for (let x = b.x + 8; x < b.x + b.w; x += 16) { ctx.beginPath(); ctx.arc(x, y, 2 + 3 * (y - b.y) / b.h, 0, 7); ctx.fill(); }
+    else { ctx.lineWidth = 2; for (let d = -b.h; d < b.w; d += 16) { ctx.beginPath(); ctx.moveTo(b.x + d, b.y + b.h); ctx.lineTo(b.x + d + b.h, b.y); ctx.stroke(); } }
+    ctx.restore();
+  });
+  // one oversized headline (Plus Jakarta Sans 800), sized to the block width
+  ctx.font = "800 100px 'Plus Jakarta Sans', sans-serif";
+  const size = Math.min(L.head.h * 0.9, 100 * L.head.w / ctx.measureText(L.word).width);
+  ctx.font = `800 ${size}px 'Plus Jakarta Sans', sans-serif`; ctx.fillStyle = pal.ink; ctx.globalAlpha = expo(t); ctx.textBaseline = 'bottom';
+  ctx.fillText(L.word, L.head.x, L.head.y + L.head.h);
+  // footer: mono only for data
+  ctx.globalAlpha = t; ctx.font = "400 11px 'IBM Plex Mono', monospace"; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(`${seed} · ${P.palette.toUpperCase()} · ${W}×${H}`, L.box.x, L.dh - L.m - 16);
+  ctx.restore();
+}
+
+// ── Preview + entrance animation
+const cv = document.getElementById('poster'), ctx = cv.getContext('2d');
+let t0 = 0;
+function render() {
+  const st = document.getElementById('stage').getBoundingClientRect(), [W, H] = SCREENS[P.screen], k = Math.min((st.width - 32) / W, (st.height - 32) / H, 1) * devicePixelRatio;
+  cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+  cv.style.width = cv.width / devicePixelRatio + 'px';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  t0 = performance.now();
+  const tick = (now) => { const t = reduce ? 1 : Math.min(1, (now - t0) / 1700); drawScaled(t); if (t < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+function drawScaled(t) { const [W, H] = SCREENS[P.screen], s = cv.width / W; ctx.setTransform(s, 0, 0, s, 0, 0); draw(ctx, W, H, t); ctx.setTransform(1, 0, 0, 1, 0, 0); }
+// The preview draws at W×H then scales; the export draws the same at native size.
+
+function generate(s) { seed = (s || newSeed()).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || newSeed(); seedIn.value = seed; render(); }
+
+// ── Exact-size PNG export (artifact download capability when available)
+async function download() {
+  const [W, H] = SCREENS[P.screen], c = document.createElement('canvas'); c.width = W; c.height = H;
+  await document.fonts.ready; draw(c.getContext('2d'), W, H, 1);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  const filename = `wallforce-light_${seed}_${W}x${H}.png`;
+  if (window.__WF_TEST) { window.__WF_LAST = { filename, blob }; return; }
+  const dl = window.claude?.use ? await window.claude.use('downloads').catch(() => null) : null;
+  if (dl) return dl.save({ filename, data: blob });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename }); a.click();
+}
+
+const seedIn = document.getElementById('seed');
+document.getElementById('gen').onclick = () => generate();
+document.getElementById('png').onclick = download;
+seedIn.onkeydown = (e) => { if (e.key === 'Enter') generate(seedIn.value); e.stopPropagation(); };
+addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT') return; if (e.key === ' ') { e.preventDefault(); generate(); } if (e.key === 'd' || e.key === 'D') download(); });
+addEventListener('resize', () => render());
+
+const pane = new Pane({ container: document.getElementById('pane') });
+pane.addBinding(P, 'screen', { label: 'Screen', options: Object.fromEntries(Object.keys(SCREENS).map((k) => [k, k])) });
+pane.addBinding(P, 'palette', { label: 'Palette', options: Object.fromEntries(Object.keys(PALETTES).map((k) => [k.toUpperCase(), k])) });
+pane.addBinding(P, 'margin', { label: 'Margin', min: 0, max: 160, step: 8 });
+pane.addBinding(P, 'cell', { label: 'Cell', min: 64, max: 256, step: 8 });
+pane.addBinding(P, 'count', { label: 'Count', min: 1, max: 12, step: 1 });
+pane.on('change', () => render());
+
+document.fonts.ready.then(() => generate(seed));
+window.__wf = { generate, download, get seed() { return seed; }, P };
+</script>
